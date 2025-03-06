@@ -44,6 +44,11 @@ class _CardFolderScreenState extends State<CardFolderScreen> {
 
   // Add card to the selected folder
   Future<void> _addCardToFolder() async {
+    if (_cards.length >= 6) {
+      _showErrorDialog();
+      return;
+    }
+
     final cardNameController = TextEditingController();
     final cardSuitController = TextEditingController();
     final cardImageController = TextEditingController();
@@ -87,6 +92,7 @@ class _CardFolderScreenState extends State<CardFolderScreen> {
                 if (cardNameController.text.isNotEmpty &&
                     cardSuitController.text.isNotEmpty) {
                   final newCard = {
+                    'id': DateTime.now().millisecondsSinceEpoch,
                     'name': cardNameController.text,
                     'suit': cardSuitController.text,
                     'image_url': cardImageController.text.isEmpty
@@ -101,6 +107,48 @@ class _CardFolderScreenState extends State<CardFolderScreen> {
                 }
               },
               child: const Text('Add'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // Show error dialog if folder has more than 6 cards
+  void _showErrorDialog() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Error'),
+          content: const Text('This folder can only hold 6 cards.'),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: const Text('OK'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // Show warning dialog if folder has fewer than 3 cards
+  void _showWarningDialog() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Warning'),
+          content: const Text('You need at least 3 cards in this folder.'),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: const Text('OK'),
             ),
           ],
         );
@@ -186,6 +234,11 @@ class _CardFolderScreenState extends State<CardFolderScreen> {
       _mockDatabase.removeWhere((card) => card['id'] == cardId);
     });
     _loadCards(_selectedFolderId!);  // Reload cards after deletion
+
+    // Check if we have fewer than 3 cards and show a warning
+    if (_cards.length < 3) {
+      _showWarningDialog();
+    }
   }
 
   // Build card widget with delete option
