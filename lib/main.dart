@@ -1,58 +1,66 @@
 import 'package:flutter/material.dart';
+import 'database_helper.dart';
 
 void main() {
-  runApp(MyApp());
+  runApp(const MyApp());
 }
 
 class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Card Folder App',
+      title: 'Cards Folders',
       theme: ThemeData(
         primarySwatch: Colors.blue,
       ),
-      home: CardFolderScreen(),
+      home: const CardFolderScreen(),
     );
   }
 }
 
 class CardFolderScreen extends StatefulWidget {
+  const CardFolderScreen({super.key});
+
   @override
   _CardFolderScreenState createState() => _CardFolderScreenState();
 }
 
 class _CardFolderScreenState extends State<CardFolderScreen> {
-  int? _selectedFolderId = 1; // For this example, we assume the selected folder is 1
-  List<Map<String, dynamic>> _cards = []; // Cards in the selected folder
+  int? _selectedFolderId;
+  List<Map<String, dynamic>> _folders = [];
+  List<Map<String, dynamic>> _cards = [];
 
   @override
   void initState() {
     super.initState();
-    _loadCards(_selectedFolderId!);
+    _loadFolders();
   }
 
-  // Mock database helper to simulate card operations
-  final List<Map<String, dynamic>> _mockDatabase = [];
-
-  // Load cards from the selected folder
-  void _loadCards(int folderId) {
+  // Load folders from database
+  void _loadFolders() async {
+    final folders = await DatabaseHelper.getFolders();
     setState(() {
-      _cards = _mockDatabase.where((card) => card['folder_id'] == folderId).toList();
+      _folders = folders;
     });
   }
 
-  // Add card to the selected folder
-  Future<void> _addCardToFolder() async {
-    if (_cards.length >= 6) {
-      _showErrorDialog();
-      return;
-    }
+  // Load cards from a selected folder
+  void _loadCards(int folderId) async {
+    final cards = await DatabaseHelper.getCards(folderId);
+    setState(() {
+      _selectedFolderId = folderId;
+      _cards = cards;
+    });
+  }
 
+  // Add card to a selected folder
+  Future<void> _addCardToFolder() async {
     final cardNameController = TextEditingController();
     final cardSuitController = TextEditingController();
     final cardImageController = TextEditingController();
-    final cardUrlController = TextEditingController(text: 'https://en.wikipedia.org/wiki/Diamonds_(suit)');
+    final cardUrlController = TextEditingController();
 
     showDialog(
       context: context,
@@ -88,11 +96,10 @@ class _CardFolderScreenState extends State<CardFolderScreen> {
               child: const Text('Cancel'),
             ),
             TextButton(
-              onPressed: () {
+              onPressed: () async {
                 if (cardNameController.text.isNotEmpty &&
                     cardSuitController.text.isNotEmpty) {
                   final newCard = {
-                    'id': DateTime.now().millisecondsSinceEpoch,
                     'name': cardNameController.text,
                     'suit': cardSuitController.text,
                     'image_url': cardImageController.text.isEmpty
@@ -101,7 +108,7 @@ class _CardFolderScreenState extends State<CardFolderScreen> {
                     'folder_id': _selectedFolderId,
                     'resource_url': cardUrlController.text,
                   };
-                  _mockDatabase.add(newCard);
+                  await DatabaseHelper.addCard(newCard);
                   _loadCards(_selectedFolderId!);  // Reload cards after insertion
                   Navigator.of(context).pop();
                 }
@@ -114,141 +121,26 @@ class _CardFolderScreenState extends State<CardFolderScreen> {
     );
   }
 
-  // Show error dialog if folder has more than 6 cards
-  void _showErrorDialog() {
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Error'),
-          content: const Text('This folder can only hold 6 cards.'),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-              child: const Text('OK'),
-            ),
-          ],
-        );
-      },
+  // Build folder widget
+  Widget _buildFolderWidget(Map<String, dynamic> folder) {
+    return Card(
+      child: ListTile(
+        title: Text(folder['name']),
+        onTap: () {
+          _loadCards(folder['id']);
+        },
+      ),
     );
   }
 
-  // Show warning dialog if folder has fewer than 3 cards
-  void _showWarningDialog() {
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Warning'),
-          content: const Text('You need at least 3 cards in this folder.'),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-              child: const Text('OK'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  // Update card details
-  Future<void> _updateCard(int cardId) async {
-    final cardNameController = TextEditingController();
-    final cardSuitController = TextEditingController();
-    final cardImageController = TextEditingController();
-    final cardUrlController = TextEditingController();
-
-    final card = _mockDatabase.firstWhere((card) => card['id'] == cardId);
-
-    cardNameController.text = card['name'];
-    cardSuitController.text = card['suit'];
-    cardImageController.text = card['image_url'] ?? '';
-    cardUrlController.text = card['resource_url'] ?? '';
-
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Edit Card'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: cardNameController,
-                decoration: const InputDecoration(labelText: 'Card Name'),
-              ),
-              TextField(
-                controller: cardSuitController,
-                decoration: const InputDecoration(labelText: 'Suit'),
-              ),
-              TextField(
-                controller: cardImageController,
-                decoration: const InputDecoration(labelText: 'Image URL'),
-              ),
-              TextField(
-                controller: cardUrlController,
-                decoration: const InputDecoration(labelText: 'Resource URL'),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-              child: const Text('Cancel'),
-            ),
-            TextButton(
-              onPressed: () {
-                if (cardNameController.text.isNotEmpty &&
-                    cardSuitController.text.isNotEmpty) {
-                  final updatedCard = {
-                    'name': cardNameController.text,
-                    'suit': cardSuitController.text,
-                    'image_url': cardImageController.text.isEmpty
-                        ? null
-                        : cardImageController.text,
-                    'resource_url': cardUrlController.text,
-                  };
-                  _mockDatabase[_mockDatabase.indexWhere((card) => card['id'] == cardId)] = updatedCard;
-                  _loadCards(_selectedFolderId!);  // Reload cards after update
-                  Navigator.of(context).pop();
-                }
-              },
-              child: const Text('Update'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  // Delete card from folder
-  Future<void> _deleteCard(int cardId) async {
-    setState(() {
-      _mockDatabase.removeWhere((card) => card['id'] == cardId);
-    });
-    _loadCards(_selectedFolderId!);  // Reload cards after deletion
-
-    // Check if we have fewer than 3 cards and show a warning
-    if (_cards.length < 3) {
-      _showWarningDialog();
-    }
-  }
-
-  // Build card widget with delete option
+  // Build card widget
   Widget _buildCardWidget(Map<String, dynamic> card) {
     return Card(
       child: ListTile(
         title: Text(card['name']),
         subtitle: Text('Suit: ${card['suit']}'),
         trailing: IconButton(
-          icon: Icon(Icons.delete),
+          icon: const Icon(Icons.delete),
           onPressed: () {
             _deleteCard(card['id']);
           },
@@ -256,32 +148,41 @@ class _CardFolderScreenState extends State<CardFolderScreen> {
         onTap: () {
           _updateCard(card['id']);
         },
+        leading: card['image_url'] != null
+            ? Image.network(card['image_url'])
+            : null,  // Display the card image from the URL
       ),
     );
   }
 
-  // Display cards in the selected folder
-  Widget _buildFolderCards(List<Map<String, dynamic>> cards) {
-    return ListView.builder(
-      itemCount: cards.length,
-      itemBuilder: (context, index) {
-        return _buildCardWidget(cards[index]);
-      },
-    );
+  // Update card details
+  Future<void> _updateCard(int cardId) async {
+    // Implementation for updating card details
+  }
+
+  // Delete card from folder
+  Future<void> _deleteCard(int cardId) async {
+    await DatabaseHelper.deleteCard(cardId);  // Delete the card from the database
+    _loadCards(_selectedFolderId!);  // Reload the cards after deletion
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Folder: $_selectedFolderId'),
+        title: const Text('Cards Folders'),
       ),
-      body: _cards.isEmpty
-          ? Center(child: Text('No cards in this folder.'))
-          : _buildFolderCards(_cards),
+      body: _folders.isEmpty
+          ? const Center(child: Text('No folders available.'))
+          : ListView.builder(
+              itemCount: _folders.length,
+              itemBuilder: (context, index) {
+                return _buildFolderWidget(_folders[index]);
+              },
+            ),
       floatingActionButton: FloatingActionButton(
         onPressed: _addCardToFolder,
-        child: Icon(Icons.add),
+        child: const Icon(Icons.add),
       ),
     );
   }
